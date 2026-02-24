@@ -1,153 +1,77 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>บันทึกเงินออม ปฏิทินการผ่อนชำระหนี้</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Kanit', sans-serif; }</style>
-</head>
-<body class="bg-slate-50 min-h-screen pb-10">
-
-    <div id="auth-ui" class="max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl mt-10 border border-slate-100">
-        <h2 class="text-2xl font-bold mb-6 text-center text-indigo-600">เข้าสู่ระบบบันทึกเงินออม</h2>
-        <input type="email" id="email" placeholder="อีเมล" class="w-full p-4 bg-slate-50 rounded-2xl mb-3 outline-none border focus:border-indigo-500">
-        <input type="password" id="password" placeholder="รหัสผ่าน" class="w-full p-4 bg-slate-50 rounded-2xl mb-6 outline-none border focus:border-indigo-500">
-        <div class="flex gap-2">
-            <button onclick="signIn()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold">เข้าสู่ระบบ</button>
-            <button onclick="signUp()" class="flex-1 bg-slate-100 text-slate-600 py-4 rounded-2xl font-bold">สมัครใหม่</button>
-        </div>
-    </div>
-
-    <div id="app-ui" class="hidden max-w-md mx-auto p-4 space-y-6">
-        
-        <div class="flex justify-between items-center mt-4">
-            <p id="user-display" class="text-[10px] font-bold text-slate-400 uppercase"></p>
-            <button onclick="signOut()" class="text-[10px] text-red-500 font-bold underline">ออกจากระบบ</button>
-        </div>
-
-        <div class="bg-gradient-to-br from-indigo-600 to-indigo-900 text-white p-8 rounded-[2.5rem] shadow-xl text-center">
-            <p class="text-indigo-100 text-sm mb-1 opacity-80 font-light">ยอดเงินออมรวมทั้งหมด</p>
-            <h1 id="total-balance" class="text-5xl font-bold tracking-tight">฿ 0.00</h1>
-        </div>
-
-        <div class="grid grid-cols-1 gap-3">
-            <div class="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-2">
-                <span class="text-xs font-bold text-blue-500 min-w-[70px]">💰 ออมเงิน</span>
-                <input type="number" id="save-amt" placeholder="0.00" class="flex-1 bg-transparent outline-none font-bold text-slate-700">
-                <button onclick="saveMoney('save-amt', 'ออมเงิน')" class="bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all">บันทึก</button>
-            </div>
-            <div class="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-2">
-                <span class="text-xs font-bold text-green-500 min-w-[70px]">📈 รายรับ</span>
-                <input type="number" id="income-amt" placeholder="0.00" class="flex-1 bg-transparent outline-none font-bold text-slate-700">
-                <button onclick="saveMoney('income-amt', 'รายรับ')" class="bg-green-500 text-white px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all">บันทึก</button>
-            </div>
-            <div class="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-2">
-                <span class="text-xs font-bold text-red-500 min-w-[70px]">📉 รายจ่าย</span>
-                <input type="number" id="expense-amt" placeholder="0.00" class="flex-1 bg-transparent outline-none font-bold text-slate-700">
-                <button onclick="saveMoney('expense-amt', 'รายจ่าย')" class="bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-bold active:scale-95 transition-all">บันทึก</button>
+<div class="bg-white p-5 rounded-3xl shadow-sm border mt-4">
+            <h3 class="font-bold text-sm text-gray-700 mb-3">🕒 ประวัติรายการล่าสุด</h3>
+            <div id="history-list" class="space-y-2 max-h-60 overflow-y-auto">
+                <p class="text-center text-gray-400 text-xs py-4">ยังไม่มีรายการ</p>
             </div>
         </div>
 
-        <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-            <h3 class="font-bold text-slate-800 text-sm mb-3 underline decoration-indigo-200">📜 รายการบันทึกเงิน</h3>
-            <div id="history-list" class="space-y-3 max-h-60 overflow-y-auto pr-1">
-                <p class="text-center text-slate-300 text-xs py-4">ยังไม่มีข้อมูลบันทึก</p>
-            </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-slate-800 text-sm">🗓️ ปฏิทินการผ่อนชำระหนี้</h3>
-                <span id="paid-count" class="bg-green-100 text-green-600 px-3 py-1 rounded-full text-[10px] font-bold">0/50</span>
-            </div>
-            <div id="debt-grid" class="grid grid-cols-5 gap-2"></div>
-        </div>
     </div>
 
     <script>
-        // ข้อมูล Supabase ของคุณ
-        const SB_URL = 'https://outuhvsmvmbseccdfvwb.supabase.co';
-        const SB_KEY = 'sb_publishable_WKuvVWnMiDtPmgQXSzP_xA_lWOdOUyK'; 
-        const _supabase = supabase.createClient(SB_URL, SB_KEY);
+        // *** (ส่วนเชื่อมต่อ Supabase และ Auth เหมือนเดิม) ***
 
-        _supabase.auth.onAuthStateChange((event, session) => {
-            if (session) {
-                document.getElementById('auth-ui').classList.add('hidden');
-                document.getElementById('app-ui').classList.remove('hidden');
-                document.getElementById('user-display').innerText = session.user.email;
-                loadData();
-            } else {
-                document.getElementById('auth-ui').classList.remove('hidden');
-                document.getElementById('app-ui').classList.add('hidden');
-            }
-        });
-
-        async function signIn() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const { error } = await _supabase.auth.signInWithPassword({ email, password });
-            if (error) alert("เข้าสู่ระบบไม่ได้: " + error.message);
-        }
-
-        async function signUp() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const { error } = await _supabase.auth.signUp({ email, password });
-            if (error) alert(error.message); else alert("สมัครเรียบร้อย! ลองกดปุ่มเข้าสู่ระบบอีกครั้ง");
-        }
-
-        async function signOut() { await _supabase.auth.signOut(); }
-
-        async function saveMoney(inputId, note) {
-            const amt = document.getElementById(inputId).value;
-            if(!amt) return;
-            const { data: { user } } = await _supabase.auth.getUser();
-            let finalAmt = (note === 'รายจ่าย') ? -parseFloat(amt) : parseFloat(amt);
-            const { error } = await _supabase.from('transactions').insert([{ amount: finalAmt, user_id: user.id, note: note }]);
-            if (!error) { document.getElementById(inputId).value = ''; loadData(); }
-        }
-
+        // ปรับฟังก์ชัน loadData ให้แสดงประวัติด้วย
         async function loadData() {
+            // ดึงข้อมูลโดยเรียงจากใหม่ไปเก่า (order by created_at descending)
             const { data: trans } = await _supabase.from('transactions').select('*').order('created_at', { ascending: false });
-            let total = 0;
-            const historyDiv = document.getElementById('history-list');
-            historyDiv.innerHTML = '';
-            if (trans && trans.length > 0) {
+            
+            let saving = 0, income = 0, expense = 0;
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = ''; // ล้างค่าเก่า
+            
+            if(trans && trans.length > 0) {
                 trans.forEach(t => {
-                    total += t.amount;
-                    const date = new Date(t.created_at).toLocaleDateString('th-TH', {day:'numeric', month:'short'});
-                    historyDiv.innerHTML += `
-                        <div class="flex justify-between items-center text-xs border-b border-slate-50 pb-2">
-                            <div><p class="font-bold text-slate-600">${t.note || 'รายการ'}</p><p class="text-[10px] text-slate-400">${date}</p></div>
-                            <p class="font-bold ${t.amount > 0 ? 'text-green-500' : 'text-red-500'}">${t.amount > 0 ? '+' : ''}${t.amount.toLocaleString()}</p>
-                        </div>`;
+                    if(t.type === 'saving') saving += t.amount;
+                    if(t.type === 'income') income += t.amount;
+                    if(t.type === 'expense') expense += t.amount;
+
+                    // สร้างการแสดงผลแต่ละรายการ
+                    const date = new Date(t.created_at).toLocaleString('th-TH', { 
+                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' 
+                    });
+                    
+                    let typeText = '', typeColor = '';
+                    if(t.type === 'saving') { typeText = 'ออมเงิน'; typeColor = 'text-blue-600'; }
+                    if(t.type === 'income') { typeText = 'รายรับ'; typeColor = 'text-green-600'; }
+                    if(t.type === 'expense') { typeText = 'รายจ่าย'; typeColor = 'text-red-600'; }
+
+                    historyList.innerHTML += `
+                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-2xl border-b border-gray-100">
+                            <div>
+                                <p class="text-xs font-bold ${typeColor}">${typeText}</p>
+                                <p class="text-[10px] text-gray-400">${date}</p>
+                            </div>
+                            <p class="font-bold ${typeColor}">${t.type === 'expense' ? '-' : '+'}${t.amount.toLocaleString()}</p>
+                        </div>
+                    `;
                 });
             } else {
-                historyDiv.innerHTML = '<p class="text-center text-slate-300 text-xs py-4">ยังไม่มีข้อมูลบันทึก</p>';
+                historyList.innerHTML = '<p class="text-center text-gray-400 text-xs py-4">ยังไม่มีรายการ</p>';
             }
-            document.getElementById('total-balance').innerText = `฿ ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
 
+            document.getElementById('sum-saving').innerText = `฿${saving.toLocaleString()}`;
+            document.getElementById('sum-net').innerText = `฿${(income - expense).toLocaleString()}`;
+
+            // (ส่วนของงวดหนี้เหมือนเดิม...)
+            loadDebtData();
+        }
+        
+        // แยกส่วนโหลดหนี้ออกมาเพื่อให้โค้ดไม่งง
+        async function loadDebtData() {
             const { data: debts } = await _supabase.from('debts').select('*');
             const grid = document.getElementById('debt-grid');
             grid.innerHTML = '';
-            let count = 0;
+            let paidCount = 0;
             for(let i=1; i<=50; i++) {
-                const isPaid = debts?.find(d => d.installment_no === i)?.is_paid;
-                if(isPaid) count++;
-                grid.innerHTML += `<div onclick="toggleDebt(${i}, ${isPaid})" class="aspect-square flex items-center justify-center rounded-xl font-bold cursor-pointer text-xs ${isPaid ? 'bg-green-500 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}">${i}</div>`;
+                const isPaid = const SB_URL = 'https://outuhvsmvmbseccdfvwb.supabase.co'; //const SB_KEY = 'sb_publishable_WKuvVWnMiDtPmgQXSzP_xA_lWOdOUyK';              //debts?.find(d => d.installment_no === i)?.is_paid;
+                if(isPaid) paidCount++;
+                grid.innerHTML += `
+                    <div onclick="toggleDebt(${i}, ${isPaid})" 
+                         class="aspect-square flex items-center justify-center rounded-xl font-bold cursor-pointer text-[10px] transition
+                         ${isPaid ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-400 border border-gray-200'}">
+                        ${i}
+                    </div>`;
             }
-            document.getElementById('paid-count').innerText = `${count}/50`;
-        }
-
-        async function toggleDebt(num, status) {
-            const { data: { user } } = await _supabase.auth.getUser();
-            // ติ๊กงวดหนี้ (ตอนนี้จะทำงานได้แน่นอนเพราะรัน SQL สำเร็จแล้ว)
-            await _supabase.from('debts').upsert({ installment_no: num, is_paid: !status, user_id: user.id }, { onConflict: 'installment_no, user_id' });
-            loadData();
+            document.getElementById('debt-status').innerText = `${paidCount}/50 งวด`;
         }
     </script>
-</body>
-</html>
